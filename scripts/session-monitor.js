@@ -242,6 +242,10 @@ async function processLine(line, hash) {
         lastEvents: [],
         summary: "",
         hookPing: null,
+        latestModel: "",
+        latestPrompt: "",
+        preventedContinuation: false,
+        stopReason: "",
       });
     }
 
@@ -273,6 +277,21 @@ async function processLine(line, hash) {
     if (d.type === "assistant" && d.message && Array.isArray(d.message.content)) {
       const texts = d.message.content.filter(c => typeof c === "object" && c.type === "text").map(c => c.text).join(" ").slice(0, 80);
       if (texts) session.summary = texts;
+    }
+
+    // 记录模型名称
+    if (d.type === "assistant" && d.message && d.message.model) {
+      session.latestModel = d.message.model;
+      if (d.message.stopReason) session.stopReason = d.message.stopReason;
+      if (d.preventedContinuation !== undefined) session.preventedContinuation = d.preventedContinuation;
+    }
+
+    // 记录用户最新 prompt
+    if (d.type === "user" && d.message && typeof d.message.content === "string" && d.message.content.trim()) {
+      session.latestPrompt = d.message.content.slice(0, 120);
+    }
+    if (d.type === "last-prompt" && d.lastPrompt) {
+      session.latestPrompt = d.lastPrompt.slice(0, 120);
     }
 
   } catch { /* JSON parse error — skip */ }
@@ -309,9 +328,9 @@ async function scanRound() {
       try {
         const stat = await fsp.stat(filePath);
         filePositions.set(filePath, stat.size);
-        // 新文件 → 扫描前几行获取基本信息
+        // 新文件 → 扫描全部行获取完整信息
         const content = await fsp.readFile(filePath, "utf8");
-        const lines = content.trim().split("\n").filter(Boolean).slice(0, 5);
+        const lines = content.trim().split("\n").filter(Boolean);
         for (const line of lines) {
           await processLine(line, hash);
         }
@@ -363,6 +382,10 @@ function getSnapshot() {
       startedAt: s.startedAt,
       summary: s.summary || "",
       lastAgo: formatDuration(Date.now() - new Date(s.lastActivityAt).getTime()),
+        latestModel: s.latestModel || "",
+        latestPrompt: s.latestPrompt || "",
+        preventedContinuation: s.preventedContinuation || false,
+        stopReason: s.stopReason || "",
     };
     activeSessions.push(entry);
 

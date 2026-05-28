@@ -215,6 +215,61 @@ body {
   color: #c0bdb2; margin-top: 1px;
 }
 
+/* Meta row: session ID + model tag */
+.card-meta-row {
+  display: flex; align-items: center; gap: 6px; margin-top: 1px; min-height: 16px;
+}
+.card-meta-row .card-title.id { margin-top: 0; }
+
+.model-tag {
+  display: inline-flex; align-items: center;
+  font-size: 9px; font-weight: 600;
+  padding: 1px 6px; border-radius: 4px;
+  background: #e8e8e8; color: #6b6b6b;
+  letter-spacing: 0.02em;
+  line-height: 1.3;
+}
+.card.status-working .model-tag {
+  background: #d4edda; color: #1e7e34;
+}
+
+/* Prompt preview */
+.card-prompt {
+  display: flex; align-items: flex-start; gap: 4px;
+  margin-top: 4px; padding: 4px 6px;
+  background: #f4f4f5; border-radius: 6px;
+  font-size: 10px; line-height: 1.4;
+  min-height: 0;
+}
+.card-prompt .prompt-icon { flex-shrink: 0; font-size: 9px; opacity: 0.6; }
+.card-prompt .prompt-text {
+  color: #7a7568; flex: 1;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.card.status-working .card-prompt { background: #edf7f2; }
+.card.status-working .card-prompt .prompt-text { color: #4a7a5a; }
+
+/* Card footer */
+.card-footer {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-top: 6px; padding-top: 6px;
+  border-top: 1px solid #eaeaea;
+}
+.card-footer .activity-time {
+  font-size: 10px; color: #b0aca0; font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.card-flags {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; color: #b0aca0; font-weight: 500;
+}
+.card-flags .stop-reason {
+  font-family: "SF Mono", "Menlo", monospace;
+  padding: 0 5px; border-radius: 3px;
+  background: #f0f0f0; color: #8d877b;
+  font-size: 9px;
+}
+
 /* Status pill */
 .status-pill {
   display: flex; align-items: center; gap: 4px; flex-shrink: 0;
@@ -239,13 +294,6 @@ body {
   margin-top: 2px;
 }
 
-/* Activity time (replaces progress bar) */
-.card-footer {
-  display: flex; align-items: center; justify-content: flex-end; gap: 6px;
-  margin-top: 8px; padding-top: 6px;
-  border-top: 1px solid #eaeaea;
-}
-.card-footer .activity-time {
   font-size: 10px; color: #b0aca0; font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
@@ -405,12 +453,22 @@ function renderCard(session) {
   const filtered = activeFilter !== "all" && session.project !== activeFilter;
   const displayName = session.title || `# ${session.id}`;
 
+  const modelHtml = session.latestModel ? `<span class="model-tag">${escapeHtml(session.latestModel)}</span>` : "";
+  const promptHtml = session.latestPrompt ? `<div class="card-prompt"><span class="prompt-icon">💬</span><span class="prompt-text">${escapeHtml(session.latestPrompt)}</span></div>` : "";
+  const flags = [];
+  if (session.preventedContinuation) flags.push("⏸ 已暂停");
+  if (session.stopReason) flags.push(`<span class="stop-reason">${escapeHtml(session.stopReason)}</span>`);
+  const flagsHtml = flags.length ? `<span class="card-flags">${flags.join(" · ")}</span>` : "";
+
   return `
     <div class="card status-${sc} ${filtered ? "filtered-out" : ""}">
       <div class="card-top">
         <div class="card-title-group">
           <div class="card-title">${escapeHtml(displayName)}</div>
-          <div class="card-title id">${session.title ? "# " + escapeHtml(session.id) : "# " + escapeHtml(session.id)}</div>
+          <div class="card-meta-row">
+            <span class="card-title id">${session.title ? "# " + escapeHtml(session.id) : "# " + escapeHtml(session.id)}</span>
+            ${modelHtml}
+          </div>
         </div>
         <span class="status-pill ${sc}">
           <span class="pulse-dot"></span>
@@ -418,8 +476,10 @@ function renderCard(session) {
         </span>
       </div>
       ${session.summary ? `<div class="card-summary">${escapeHtml(session.summary)}</div>` : ""}
+      ${promptHtml}
       <div class="card-footer">
         <span class="activity-time">${escapeHtml(session.lastAgo || ago(session.lastActivityAt))}</span>
+        ${flagsHtml}
       </div>
     </div>
   `;
@@ -476,7 +536,7 @@ function renderAll(snapshot) {
 
   renderProjects(displaySnapshot);
   renderFilters(snapshot);
-  lastUpdateEl.textContent = ago(snapshot.generatedAt) + " 前";
+  lastUpdateEl.textContent = ago(snapshot.generatedAt);
 }
 
 // ─── 项目拖拽排序 ───
@@ -610,7 +670,7 @@ try {
 
 setInterval(() => {
   if (!lastSnapshot) return;
-  lastUpdateEl.textContent = ago(lastSnapshot.generatedAt) + " 前";
+  lastUpdateEl.textContent = ago(lastSnapshot.generatedAt);
   document.querySelectorAll(".activity-time").forEach(el => {
     const card = el.closest(".card");
     if (!card) return;
@@ -625,7 +685,7 @@ setInterval(() => {
       }
     }
   });
-}, 5000);
+}, 30000);
 
 })();
 </script>
