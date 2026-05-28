@@ -1,4 +1,4 @@
-﻿(function () {
+(function () {
   const {
     connectSnapshotStream,
     copyText,
@@ -55,37 +55,67 @@
     const monitor = snapshot.monitor || {};
     const runtime = monitor.runtime || {};
     const managed = monitor.managed || {};
+    const claude = monitor.claude || {};
 
+    // Top 3 summary cards
     document.getElementById("monitor-overview").innerHTML = [
+      // Card 1: Listener status
       monitorCard(
         t("monitor.cards.enabled.label"),
-        monitor.enabled ? t("monitor.cards.enabled.valueOn") : t("monitor.cards.enabled.valueOff"),
-        monitor.enabled ? t("monitor.cards.enabled.detailOn") : t("monitor.cards.enabled.detailOff"),
-        monitor.enabled ? "success" : "idle"
+        managed.active ? t("monitor.cards.enabled.valueOn") : t("monitor.cards.enabled.valueOff"),
+        managed.active ? t("monitor.cards.enabled.detailOn") : t("monitor.cards.enabled.detailOff"),
+        managed.active ? "success" : "idle"
       ),
-      monitorCard(
-        t("monitor.cards.managed.label"),
-        managed.active ? `PID ${managed.pid}` : t("monitor.cards.managed.valueOff"),
-        managed.active ? `${managed.host}:${managed.port}` : t("monitor.cards.managed.detailOff"),
-        managed.active ? "running" : "idle"
-      ),
+      // Card 2: Events count
       monitorCard(
         t("monitor.cards.events.label"),
         formatNumber(runtime.emittedEvents || 0),
-        runtime.lastFlushAt ? t("monitor.cards.events.detail", { time: formatDateTime(runtime.lastFlushAt) }) : t("monitor.cards.events.empty"),
-        runtime.lastFlushAt ? "success" : "idle"
+        runtime.lastMatchedAt ? t("monitor.cards.events.detail", { time: formatDateTime(runtime.lastMatchedAt) }) : t("monitor.cards.events.empty"),
+        runtime.lastMatchedAt ? "success" : "idle"
+      ),
+      // Card 3: Listener PID / recent call
+      monitorCard(
+        t("monitor.cards.managed.label"),
+        managed.active ? `PID ${managed.pid}` : t("monitor.cards.managed.valueOff"),
+        managed.active ? t("monitor.cards.managed.detailOn", { dir: formatShortPath(managed.rootDir) }) : t("monitor.cards.managed.detailOff"),
+        managed.active ? "running" : "idle"
       )
     ].join("");
 
+    // Path matrix section
     document.getElementById("monitor-matrix").innerHTML = [
-      monitorCard(t("monitor.cards.codexHome.label"), formatShortPath(monitor.codexHome), t("monitor.cards.codexHome.detail"), "idle", { copyValue: monitor.codexHome, showStatus: false, kind: "path" }),
-      monitorCard(t("monitor.cards.sessionsRoot.label"), formatShortPath(managed.rootDir), t("monitor.cards.sessionsRoot.detail"), managed.active ? "running" : "idle", { copyValue: managed.rootDir, showStatus: false, kind: "path" }),
-      monitorCard(t("monitor.cards.stdout.label"), formatShortPath(monitor.stdoutLogFile), t("monitor.cards.stdout.detail"), "idle", { copyValue: monitor.stdoutLogFile, showStatus: false, kind: "path" }),
-      monitorCard(t("monitor.cards.stderr.label"), formatShortPath(monitor.stderrLogFile), t("monitor.cards.stderr.detail"), "idle", { copyValue: monitor.stderrLogFile, showStatus: false, kind: "path" }),
+      monitorCard(
+        t("monitor.cards.codexHome.label"),
+        formatShortPath(claude.projectsDir || ""),
+        t("monitor.cards.codexHome.detail"),
+        "idle",
+        { copyValue: claude.projectsDir || "", showStatus: false, kind: "path" }
+      ),
+      monitorCard(
+        t("monitor.cards.sessionsRoot.label"),
+        formatShortPath(claude.skillsDir || ""),
+        t("monitor.cards.sessionsRoot.detail"),
+        "idle",
+        { copyValue: claude.skillsDir || "", showStatus: false, kind: "path" }
+      ),
+      monitorCard(
+        t("monitor.cards.stdout.label"),
+        formatShortPath(claude.dashboardLog || ""),
+        t("monitor.cards.stdout.detail"),
+        "idle",
+        { copyValue: claude.dashboardLog || "", showStatus: false, kind: "path" }
+      ),
+      monitorCard(
+        t("monitor.cards.stderr.label"),
+        formatShortPath(claude.monitorLog || ""),
+        t("monitor.cards.stderr.detail"),
+        "idle",
+        { copyValue: claude.monitorLog || "", showStatus: false, kind: "path" }
+      ),
       monitorCard(
         t("monitor.cards.lastMatched.label"),
-        formatDateTime(runtime.lastMatchedAt),
-        runtime.lastMatchedAt ? t("monitor.cards.lastMatched.detail", { count: formatNumber(runtime.matchedLines || 0) }) : t("monitor.cards.lastMatched.empty"),
+        runtime.lastMatchedAt ? formatDateTime(runtime.lastMatchedAt) : t("monitor.cards.lastMatched.empty"),
+        runtime.lastMatchedAt ? t("monitor.cards.lastMatched.detail", { count: formatNumber(runtime.emittedEvents || 0) }) : "",
         runtime.lastMatchedAt ? "success" : "idle"
       ),
       monitorCard(

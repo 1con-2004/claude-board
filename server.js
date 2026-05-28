@@ -14,8 +14,8 @@ const ROOT_DIR = __dirname;
 const PUBLIC_DIR = path.join(ROOT_DIR, "public");
 const SERVER_STARTED_AT = new Date().toISOString();
 const CODEX_HOME = process.env.CODEX_HOME || path.join(os.homedir(), ".codex");
-const DATA_DIR = path.join(CODEX_HOME, "data", "skill-usage");
-const EVENTS_FILE = path.join(DATA_DIR, "skill-events.jsonl");
+const DATA_DIR = path.join(CODEX_HOME, "data", "claude-board");
+const EVENTS_FILE = path.join(DATA_DIR, "claude-events.jsonl");
 const PROCESS_STATE_FILE = path.join(ROOT_DIR, "data", "dashboard-process.json");
 const STDOUT_LOG_FILE = path.join(DATA_DIR, "dashboard.stdout.log");
 const STDERR_LOG_FILE = path.join(DATA_DIR, "dashboard.stderr.log");
@@ -184,49 +184,68 @@ async function readEvents() {
     .filter(Boolean);
 }
 
-async function getMonitorStatus() {
-  let managedProcess = null;
-
-  try {
-    const raw = await fsp.readFile(PROCESS_STATE_FILE, "utf8");
-    if (raw.trim()) {
-      managedProcess = JSON.parse(raw);
-    }
-  } catch (error) {
-    if (error.code !== "ENOENT") {
-      throw error;
-    }
+async function getMonitorStatus(events) {
+  if (!events) {
+    try { events = await readEvents(); } catch { events = []; }
   }
 
-  const managedPid = Number(managedProcess?.pid);
-  const managedAlive = isProcessAlive(managedPid);
-  const runtime = codexMonitor ? codexMonitor.getStatus() : null;
+  const lastEvent = events.length > 0 ? events[events.length - 1] : null;
+
+  // 检测 claude-code-monitor 进程
+  let listenerPid = null;
+  try {
+    const pidFile = "/tmp/claude-code-monitor.pid";
+    const raw = await fsp.readFile(pidFile, "utf8");
+    const pid = Number(raw.trim());
+    if (pid > 0 && isProcessAlive(pid)) {
+      listenerPid = pid;
+    }
+  } catch {}
+  if (!listenerPid) {
+    try {
+      const { execSync } = require("child_process");
+      const out = execSync("pgrep -f 'claude-code-monitor\\.js'", { encoding: "utf8", timeout: 2000 }).trim();
+      if (out) {
+        const pids = out.split("\n").filter(Boolean).map(Number);
+        listenerPid = pids.find(p => p !== process.pid) || null;
+      }
+    } catch {}
+  }
+
+  const claudeHome = path.join(os.homedir(), ".claude");
+  const projectsDir = path.join(claudeHome, "projects");
 
   return {
-    enabled: ENABLE_CODEX_MONITOR,
+    enabled: true,
     currentPid: process.pid,
     currentStartedAt: SERVER_STARTED_AT,
-    codexHome: CODEX_HOME,
-    stdoutLogFile: STDOUT_LOG_FILE,
-    stderrLogFile: STDERR_LOG_FILE,
-    managed: {
-      active: managedAlive,
-      pid: managedAlive ? managedPid : null,
-      port: managedAlive ? managedProcess.port : null,
-      host: managedAlive ? managedProcess.host : null,
-      startedAt: managedAlive ? managedProcess.startedAt : null,
-      rootDir: managedAlive ? managedProcess.rootDir : null
+    codexHome: projectsDir,
+    stdoutLogFile: "/tmp/claude-board-dashboard.log",
+    stderrLogFile: "/tmp/claude-code-monitor.log",
+    claude: {
+      projectsDir: projectsDir,
+      skillsDir: path.join(claudeHome, "skills"),
+      dashboardLog: "/tmp/claude-board-dashboard.log",
+      monitorLog: "/tmp/claude-code-monitor.log"
     },
-    runtime: runtime
+    managed: {
+      active: !!listenerPid,
+      pid: listenerPid,
+      port: null,
+      host: null,
+      startedAt: null,
+      rootDir: projectsDir
+    },
+    runtime: lastEvent
       ? {
-          startedAt: runtime.startedAt,
-          lastPollAt: runtime.lastPollAt,
-          lastMatchedAt: runtime.lastMatchedAt,
-          lastFlushAt: runtime.lastFlushAt,
-          matchedLines: runtime.matchedLines,
-          emittedEvents: runtime.emittedEvents,
-          activeInvocations: runtime.activeInvocations,
-          closed: runtime.closed
+          startedAt: SERVER_STARTED_AT,
+          lastPollAt: new Date().toISOString(),
+          lastMatchedAt: lastEvent.endedAt || lastEvent.startedAt,
+          lastFlushAt: new Date().toISOString(),
+          matchedLines: events.length,
+          emittedEvents: events.length,
+          activeInvocations: 0,
+          closed: false
         }
       : null
   };
@@ -236,7 +255,7 @@ async function getSnapshot(range = "12h") {
   const events = await readEvents();
   return {
     ...buildSnapshot(events, { range }),
-    monitor: await getMonitorStatus()
+    monitor: await getMonitorStatus(events)
   };
 }
 
@@ -421,7 +440,7 @@ async function start() {
 
   const server = http.createServer(requestHandler);
   server.listen(PORT, HOST, () => {
-    console.log(`Skill dashboard running at http://${HOST}:${PORT}`);
+    console.log(`ClaudeBoard running at http://${HOST}:${PORT}`);
   });
 }
 

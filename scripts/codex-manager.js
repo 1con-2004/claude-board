@@ -4,7 +4,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
 
-const SKILL_NAME = "skill-usage";
+const SKILL_NAME = "claude-board";
 const DEFAULT_PORT = Number(process.env.PORT || 3210);
 const DEFAULT_HOST = process.env.HOST || "127.0.0.1";
 const SCRIPT_DIR = __dirname;

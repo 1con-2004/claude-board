@@ -1,18 +1,18 @@
 ﻿(function (root) {
   const TIMEFRAMES = ["12h", "1d", "1m", "1y"];
-  const RANGE_STORAGE_KEY = "skill-usage-range";
-  const LANGUAGE_STORAGE_KEY = "skill-usage-language";
+  const RANGE_STORAGE_KEY = "claude-board-range";
+  const LANGUAGE_STORAGE_KEY = "claude-board-language";
   let currentLanguage = "zh";
   let lastConnectionState = true;
 
   const TRANSLATIONS = {
     zh: {
-      "doc.home": "技能看板",
-      "doc.monitor": "监控 | 技能看板",
-      "doc.trends": "趋势 | 技能看板",
-      "doc.history": "历史 | 技能看板",
-      brandEyebrow: "技能用量",
-      brandTitle: "技能看板",
+      "doc.home": "ClaudeBoard",
+      "doc.monitor": "监控 | ClaudeBoard",
+      "doc.trends": "趋势 | ClaudeBoard",
+      "doc.history": "历史 | ClaudeBoard",
+      brandEyebrow: "ClaudeBoard",
+      brandTitle: "ClaudeBoard",
       "nav.home": "首页",
       "nav.monitor": "监控",
       "nav.trends": "趋势",
@@ -80,38 +80,39 @@
       "monitor.overview.title": "状态",
       "monitor.runtime.eyebrow": "监控路径",
       "monitor.runtime.title": "进程",
-      "monitor.cards.enabled.label": "监控开关",
-      "monitor.cards.enabled.valueOn": "已启用",
-      "monitor.cards.enabled.valueOff": "未启用",
-      "monitor.cards.enabled.detailOn": "正在消费 Codex sessions",
-      "monitor.cards.enabled.detailOff": "当前未启用自动监控",
-      "monitor.cards.managed.label": "托管进程",
+      "monitor.cards.enabled.label": "监听状态",
+      "monitor.cards.enabled.valueOn": "运行中",
+      "monitor.cards.enabled.valueOff": "未运行",
+      "monitor.cards.enabled.detailOn": "Claude Code 会话监听中",
+      "monitor.cards.enabled.detailOff": "监听器未启动",
+      "monitor.cards.managed.label": "监听进程",
       "monitor.cards.managed.valueOff": "未检测到",
-      "monitor.cards.managed.detailOff": "当前服务非托管方式启动",
-      "monitor.cards.events.label": "已写入事件",
-      "monitor.cards.events.detail": "最近刷新 {time}",
-      "monitor.cards.events.empty": "等待第一笔监控事件",
-      "monitor.cards.codexHome.label": "Codex Home",
-      "monitor.cards.codexHome.detail": "监控根目录",
-      "monitor.cards.sessionsRoot.label": "Sessions 目录",
-      "monitor.cards.sessionsRoot.detail": "当前托管根目录",
-      "monitor.cards.stdout.label": "stdout 日志",
-      "monitor.cards.stdout.detail": "服务标准输出",
-      "monitor.cards.stderr.label": "stderr 日志",
-      "monitor.cards.stderr.detail": "服务错误输出",
-      "monitor.cards.lastMatched.label": "最近命中",
-      "monitor.cards.lastMatched.detail": "累计匹配 {count} 行",
-      "monitor.cards.lastMatched.empty": "等待第一笔命中",
-      "monitor.cards.currentPid.label": "当前服务 PID",
+      "monitor.cards.managed.detailOn": "监听目录 {dir}",
+      "monitor.cards.managed.detailOff": "claude-code-monitor 未运行",
+      "monitor.cards.events.label": "已捕获事件",
+      "monitor.cards.events.detail": "最近事件 {time}",
+      "monitor.cards.events.empty": "等待第一笔 Skill 调用",
+      "monitor.cards.codexHome.label": "项目目录",
+      "monitor.cards.codexHome.detail": "Claude Code 项目会话根目录",
+      "monitor.cards.sessionsRoot.label": "Skills 目录",
+      "monitor.cards.sessionsRoot.detail": "所有 Skill 定义存放位置",
+      "monitor.cards.stdout.label": "Dashboard 日志",
+      "monitor.cards.stdout.detail": "看板服务标准输出",
+      "monitor.cards.stderr.label": "监听器日志",
+      "monitor.cards.stderr.detail": "Claude Code 监听器输出",
+      "monitor.cards.lastMatched.label": "最近调用",
+      "monitor.cards.lastMatched.detail": "累计 {count} 次调用",
+      "monitor.cards.lastMatched.empty": "等待首次调用",
+      "monitor.cards.currentPid.label": "Dashboard PID",
       "monitor.cards.currentPid.detail": "启动于 {time}"
     },
     en: {
-      "doc.home": "Skill Board",
-      "doc.monitor": "Monitor | Skill Board",
-      "doc.trends": "Trends | Skill Board",
-      "doc.history": "History | Skill Board",
-      brandEyebrow: "Skill Usage",
-      brandTitle: "Skill Board",
+      "doc.home": "ClaudeBoard",
+      "doc.monitor": "Monitor | ClaudeBoard",
+      "doc.trends": "Trends | ClaudeBoard",
+      "doc.history": "History | ClaudeBoard",
+      brandEyebrow: "ClaudeBoard",
+      brandTitle: "ClaudeBoard",
       "nav.home": "Home",
       "nav.monitor": "Monitor",
       "nav.trends": "Trends",
@@ -179,29 +180,30 @@
       "monitor.overview.title": "Status",
       "monitor.runtime.eyebrow": "Paths",
       "monitor.runtime.title": "Process",
-      "monitor.cards.enabled.label": "Monitor",
-      "monitor.cards.enabled.valueOn": "Enabled",
-      "monitor.cards.enabled.valueOff": "Disabled",
-      "monitor.cards.enabled.detailOn": "Consuming Codex sessions",
-      "monitor.cards.enabled.detailOff": "Auto monitor is off",
-      "monitor.cards.managed.label": "Managed PID",
+      "monitor.cards.enabled.label": "Listener",
+      "monitor.cards.enabled.valueOn": "Running",
+      "monitor.cards.enabled.valueOff": "Stopped",
+      "monitor.cards.enabled.detailOn": "Listening to Claude Code sessions",
+      "monitor.cards.enabled.detailOff": "Listener is not running",
+      "monitor.cards.managed.label": "Listener PID",
       "monitor.cards.managed.valueOff": "Not found",
-      "monitor.cards.managed.detailOff": "Service is not managed right now",
-      "monitor.cards.events.label": "Events Written",
-      "monitor.cards.events.detail": "Last flush {time}",
-      "monitor.cards.events.empty": "Waiting for the first event",
-      "monitor.cards.codexHome.label": "Codex Home",
-      "monitor.cards.codexHome.detail": "Monitor root directory",
-      "monitor.cards.sessionsRoot.label": "Sessions Root",
-      "monitor.cards.sessionsRoot.detail": "Managed service root",
-      "monitor.cards.stdout.label": "stdout Log",
-      "monitor.cards.stdout.detail": "Service standard output",
-      "monitor.cards.stderr.label": "stderr Log",
-      "monitor.cards.stderr.detail": "Service error output",
-      "monitor.cards.lastMatched.label": "Last Match",
-      "monitor.cards.lastMatched.detail": "Matched {count} lines",
-      "monitor.cards.lastMatched.empty": "Waiting for the first match",
-      "monitor.cards.currentPid.label": "Current PID",
+      "monitor.cards.managed.detailOn": "Watching {dir}",
+      "monitor.cards.managed.detailOff": "claude-code-monitor is not running",
+      "monitor.cards.events.label": "Events Captured",
+      "monitor.cards.events.detail": "Last event {time}",
+      "monitor.cards.events.empty": "Waiting for the first skill call",
+      "monitor.cards.codexHome.label": "Projects Dir",
+      "monitor.cards.codexHome.detail": "Claude Code project sessions root",
+      "monitor.cards.sessionsRoot.label": "Skills Dir",
+      "monitor.cards.sessionsRoot.detail": "All skill definitions location",
+      "monitor.cards.stdout.label": "Dashboard Log",
+      "monitor.cards.stdout.detail": "Dashboard service output",
+      "monitor.cards.stderr.label": "Monitor Log",
+      "monitor.cards.stderr.detail": "Claude Code monitor output",
+      "monitor.cards.lastMatched.label": "Last Call",
+      "monitor.cards.lastMatched.detail": "Total {count} calls",
+      "monitor.cards.lastMatched.empty": "Waiting for the first call",
+      "monitor.cards.currentPid.label": "Dashboard PID",
       "monitor.cards.currentPid.detail": "Started at {time}"
     }
   };
@@ -436,6 +438,37 @@
 
   currentLanguage = getLanguage();
   applyI18n();
+
+  /* ---- Theme Toggle ---- */
+  function initTheme() {
+    const saved = (function () {
+      try { return localStorage.getItem("claude-board-theme"); } catch { return null; }
+    })();
+    if (saved === "dark" || (!saved && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+      document.documentElement.classList.add("dark");
+    }
+    renderThemeToggle();
+  }
+
+  function renderThemeToggle() {
+    const btn = document.getElementById("theme-toggle");
+    if (!btn) return;
+    const isDark = document.documentElement.classList.contains("dark");
+    btn.textContent = isDark ? "☀️" : "🌙";
+  }
+
+  function toggleTheme() {
+    document.documentElement.classList.toggle("dark");
+    const isDark = document.documentElement.classList.contains("dark");
+    try { localStorage.setItem("claude-board-theme", isDark ? "dark" : "light"); } catch {}
+    renderThemeToggle();
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    initTheme();
+    const btn = document.getElementById("theme-toggle");
+    if (btn) btn.addEventListener("click", toggleTheme);
+  });
 
   root.SkillUsageCore = {
     TIMEFRAMES,

@@ -26,7 +26,7 @@ const sampleEvents = [
     details: "boom"
   },
   {
-    skill: "skill-usage",
+    skill: "claude-board",
     status: "success",
     startedAt: "2026-01-10T08:00:00.000Z",
     endedAt: "2026-01-10T08:00:03.000Z",

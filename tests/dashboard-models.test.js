@@ -9,7 +9,7 @@ const {
 const skills = [
   { skill: "usage", calls: 9, avgDurationMs: 120, failureRate: 0.1, lastStatus: "success" },
   { skill: "superpowers", calls: 7, avgDurationMs: 250, failureRate: 0.2, lastStatus: "success" },
-  { skill: "skill-usage", calls: 5, avgDurationMs: 180, failureRate: 0, lastStatus: "running" },
+  { skill: "claude-board", calls: 5, avgDurationMs: 180, failureRate: 0, lastStatus: "running" },
   { skill: "webapp-testing", calls: 3, avgDurationMs: 800, failureRate: 2.5, lastStatus: "error" }
 ];
 

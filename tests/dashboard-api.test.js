@@ -29,7 +29,7 @@ async function waitForServer(child) {
 
 test("GET /api/stats honors the selected range and exposes yearly history", async (t) => {
   const codexHome = path.join(__dirname, ".tmp-codex-home");
-  const dataDir = path.join(codexHome, "data", "skill-usage");
+  const dataDir = path.join(codexHome, "data", "claude-board");
   await fs.rm(codexHome, { recursive: true, force: true });
   await fs.mkdir(dataDir, { recursive: true });
   await fs.writeFile(
@@ -52,7 +52,7 @@ test("GET /api/stats honors the selected range and exposes yearly history", asyn
       }),
       JSON.stringify({
         id: "b",
-        skill: "skill-usage",
+        skill: "claude-board",
         status: "success",
         startedAt: "2026-01-10T08:00:00.000Z",
         endedAt: "2026-01-10T08:00:02.000Z",
