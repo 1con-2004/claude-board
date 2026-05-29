@@ -24,6 +24,7 @@ const POLL_MS = 2000;
 const HOOK_PING_GRACE_MS = 15000;
 const IDLE_THRESHOLD_MS = 45000;
 const DONE_THRESHOLD_MS = 300000;
+const WAITING_THRESHOLD_MS = 600000;  // 等待 sub-agent 返回，最长保持 waiting 10min
 const SESSION_CLEANUP_IDLE_MS = 2 * 60 * 60 * 1000;    // idle > 2h 删除
 const SESSION_CLEANUP_DONE_MS = 30 * 60 * 1000;         // done > 30min 删除
 const SNAPSHOT_ACTIVE_WINDOW_MS = 4 * 60 * 60 * 1000;   // 快照仅返回 4h 内活跃的
@@ -194,6 +195,13 @@ function inferStatus(lastEvents, now, hookPing) {
   });
   if (recentTool) return "working";
 
+  // 45s 内用户刚发过消息 → AI 正在处理中，不应切 interrupt
+  const hasRecentUserMsg = lastEvents.some(e => {
+    if (!e.timestamp || e.type !== "user") return false;
+    return (now - new Date(e.timestamp).getTime()) < IDLE_THRESHOLD_MS;
+  });
+  if (hasRecentUserMsg) return "working";
+
   // 当前事件有 tool_use → working
   if (latest.type === "assistant" && latest.hasToolUse) return "working";
 
@@ -205,15 +213,27 @@ function inferStatus(lastEvents, now, hookPing) {
     return elapsed < 10000 ? "working" : "interrupt";
   }
 
+  // 等待 sub-agent 返回 → waiting（比 idle 更活跃，保持更久）
+  if (latest.hasSubAgent && elapsed < WAITING_THRESHOLD_MS) return "waiting";
+
   return "idle";
 }
 
 // ─── 解析事件 ───
 function parseEvent(d) {
-  const ev = { timestamp: d.timestamp || new Date().toISOString(), type: d.type || "unknown", hasToolUse: false };
+  const ev = {
+    timestamp: d.timestamp || new Date().toISOString(),
+    type: d.type || "unknown",
+    hasToolUse: false,
+    hasSubAgent: false,
+  };
   if (d.type === "assistant" && d.message && Array.isArray(d.message.content)) {
     ev.hasToolUse = d.message.content.some(c =>
       c && typeof c === "object" && (c.name === "Skill" || c.type === "tool_use")
+    );
+    // 检测 sub-agent 启动（Agent 工具调用）
+    ev.hasSubAgent = d.message.content.some(c =>
+      c && typeof c === "object" && (c.name === "Agent" || (c.input && c.input.subagent_type))
     );
   }
   return ev;
@@ -409,7 +429,7 @@ function getSnapshot() {
     return cmp !== 0 ? cmp : new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime();
   });
 
-  const counts = { working: 0, interrupt: 0, idle: 0, done: 0 };
+  const counts = { working: 0, interrupt: 0, waiting: 0, idle: 0, done: 0 };
   for (const s of activeSessions) { counts[s.status]++; }
 
   return {
@@ -497,11 +517,11 @@ async function handleRequest(req, res) {
     return;
   }
 
-  // 看板页面
+  // 看板页面（禁止浏览器缓存，确保动态内容实时更新）
   if (pathname === "/" || pathname === "/session-dashboard.html") {
     try {
       const html = await fsp.readFile(path.join(PUBLIC_DIR, "session-dashboard.html"), "utf8");
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, no-store, must-revalidate" });
       res.end(html);
     } catch {
       res.writeHead(404);

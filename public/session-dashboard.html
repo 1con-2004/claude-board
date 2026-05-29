@@ -4,344 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Session Monitor</title>
-<style>
-/* ─── Reset & Base ─── */
-*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-
-body {
-  font-family: -apple-system, "SF Pro Display", "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
-  background: #f0f2f5;
-  color: #1a1816;
-  min-height: 100vh;
-  -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
-}
-
-/* ─── App Shell ─── */
-.app-shell {
-  max-width: 1600px;
-  margin: 0 auto;
-  padding: 18px 28px 36px;
-  min-height: 100vh;
-}
-
-/* ─── Header ─── */
-.header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0 0 14px; flex-wrap: wrap; gap: 10px;
-  border-bottom: 1px solid #e4e7ed;
-  margin-bottom: 14px;
-}
-.header-left { display: flex; align-items: center; gap: 12px; }
-.header h1 {
-  font-size: 20px; font-weight: 650; letter-spacing: -0.02em;
-  color: #1a1816;
-}
-.header .subtitle {
-  font-size: 12px; color: #8d877b; font-weight: 450;
-  background: #f0f0ee; padding: 2px 10px; border-radius: 6px;
-}
-
-.header-right {
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-}
-
-/* ─── Status Bar ─── */
-.status-bar-summary {
-  display: flex; align-items: center; gap: 16px;
-  padding: 0 0 14px; flex-wrap: wrap;
-  border-bottom: 1px solid #e8e8e8;
-  margin-bottom: 14px;
-}
-.status-bar-summary .total-label {
-  font-size: 13px; font-weight: 600; color: #1a1816;
-}
-.status-bar-summary .total-label strong { font-size: 18px; font-weight: 700; }
-.status-bar-summary .status-tags {
-  display: flex; gap: 6px; flex-wrap: wrap;
-}
-.status-tag {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 2px 10px; border-radius: 6px;
-  font-size: 12px; font-weight: 500;
-}
-.status-tag .tag-count { font-weight: 650; }
-.status-tag.working { background: #eaf6ed; color: #2d7a4b; }
-.status-tag.interrupt { background: #fef5e0; color: #b8860b; }
-.status-tag.idle { background: #f0f0ee; color: #6b6b6b; }
-.status-tag.done { background: #f5f5f5; color: #8d877b; }
-
-.header-meta { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-.last-update {
-  font-size: 11px; color: #a09a8e; font-variant-numeric: tabular-nums; font-weight: 500;
-  white-space: nowrap;
-}
-.connection-badge {
-  display: flex; align-items: center; gap: 5px;
-  font-size: 11px; font-weight: 600;
-  padding: 4px 12px; border-radius: 8px;
-  background: #eaf6ed; color: #2d7a4b;
-  white-space: nowrap;
-}
-.connection-badge.offline { background: #fde8e4; color: #c0392b; }
-.connection-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.connection-badge.offline .connection-dot { animation: pulse 1s ease-in-out infinite; }
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-
-/* ─── Filters ─── */
-.filters {
-  display: flex; gap: 4px; flex-wrap: wrap;
-  margin-bottom: 14px;
-}
-.filter-btn {
-  padding: 5px 14px; border-radius: 8px; border: 1px solid #e4e7ed;
-  background: #fff;
-  color: #6b6559; font-size: 12px; font-weight: 600; cursor: pointer;
-  transition: all 0.15s ease;
-}
-.filter-btn:hover { border-color: #d0d0d0; color: #2c2a26; }
-.filter-btn.active {
-  background: #2c2a26; border-color: #2c2a26;
-  color: #fff;
-}
-.filter-btn .count {
-  margin-left: 4px; opacity: 0.65; font-size: 11px; font-weight: 500;
-}
-.filter-btn.active .count { opacity: 0.8; }
-
-/* ─── Projects ─── */
-.projects {
-  display: flex; flex-direction: column; gap: 20px;
-}
-.project-group { display: flex; flex-direction: column; }
-
-/* ─── Project Header ─── */
-.project-header {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 14px; cursor: grab;
-  border-radius: 10px 10px 0 0;
-  background: #f5f5f5;
-  border: 1px solid #e4e7ed;
-  border-bottom: 1px solid #e4e7ed;
-  user-select: none;
-  transition: background 0.15s;
-}
-.project-header:hover { background: #efefef; }
-.project-group:active .project-header { cursor: grabbing; }
-.project-header h2 {
-  font-size: 12px; font-weight: 700; color: #4a4843; letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-.project-header .badge {
-  font-size: 11px; color: #8d877b; background: rgba(0,0,0,0.04); font-weight: 600;
-  padding: 1px 8px; border-radius: 6px;
-}
-.project-header .badge .active-count { color: #52b788; font-weight: 700; }
-.project-header .path {
-  font-size: 10px; color: #c0bdb2; font-weight: 400; font-family: "SF Mono", "Menlo", monospace;
-  margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  max-width: 240px;
-  transition: color 0.15s;
-}
-.project-header:hover .path { color: #8d877b; }
-
-/* ─── Card Grid ─── */
-.session-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 10px;
-  padding: 14px;
-  border: 1px solid #e4e7ed;
-  border-top: none;
-  border-radius: 0 0 10px 10px;
-  background: #fff;
-}
-
-/* ─── Card ─── */
-.card {
-  position: relative;
-  background: #fafafa;
-  border: 1px solid #eceef0;
-  border-radius: 10px;
-  padding: 12px 14px;
-  transition: all 0.2s ease;
-  cursor: default;
-  display: flex;
-  flex-direction: column;
-  min-height: 90px;
-}
-.card:hover {
-  background: #f5f5f6;
-  border-color: #d0d0d0;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
-  transform: translateY(-1px);
-}
-
-/* Status accent bar */
-.card::before {
-  content: "";
-  position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
-  border-radius: 3px 0 0 3px;
-}
-.card.status-working::before { background: #52b788; box-shadow: 0 0 6px rgba(82,183,136,0.25); }
-.card.status-interrupt::before { background: #e9b741; }
-.card.status-idle::before { background: #b0b0b0; }
-.card.status-done::before { background: #c0bdb2; }
-
-/* Working card highlight */
-.card.status-working {
-  background: #f5fbf8;
-  border-color: #c8e6d6;
-}
-.card.status-working:hover {
-  background: #edf7f2;
-  border-color: #a8d4be;
-  box-shadow: 0 4px 16px rgba(82,183,136,0.12);
-}
-
-/* ─── Card Content ─── */
-.card-top {
-  display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
-  margin-bottom: 6px;
-}
-.card-title-group { display: flex; flex-direction: column; gap: 0; min-width: 0; flex: 1; }
-.card-title {
-  font-size: 14px; font-weight: 700; color: #1a1816; letter-spacing: -0.01em;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  line-height: 1.35;
-}
-.card-title.id {
-  font-family: "SF Mono", "Menlo", monospace; font-size: 10px; font-weight: 500;
-  color: #c0bdb2; margin-top: 1px;
-}
-
-/* Meta row: session ID + model tag */
-.card-meta-row {
-  display: flex; align-items: center; gap: 6px; margin-top: 1px; min-height: 16px;
-}
-.card-meta-row .card-title.id { margin-top: 0; }
-
-.model-tag {
-  display: inline-flex; align-items: center;
-  font-size: 9px; font-weight: 600;
-  padding: 1px 6px; border-radius: 4px;
-  background: #e8e8e8; color: #6b6b6b;
-  letter-spacing: 0.02em;
-  line-height: 1.3;
-}
-.card.status-working .model-tag {
-  background: #d4edda; color: #1e7e34;
-}
-
-/* Prompt preview */
-.card-prompt {
-  display: flex; align-items: flex-start; gap: 4px;
-  margin-top: 4px; padding: 4px 6px;
-  background: #f4f4f5; border-radius: 6px;
-  font-size: 10px; line-height: 1.4;
-  min-height: 0;
-}
-.card-prompt .prompt-icon { flex-shrink: 0; font-size: 9px; opacity: 0.6; }
-.card-prompt .prompt-text {
-  color: #7a7568; flex: 1;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.card.status-working .card-prompt { background: #edf7f2; }
-.card.status-working .card-prompt .prompt-text { color: #4a7a5a; }
-
-/* Card footer */
-.card-footer {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  margin-top: 6px; padding-top: 6px;
-  border-top: 1px solid #eaeaea;
-}
-.card-footer .activity-time {
-  font-size: 10px; color: #b0aca0; font-weight: 500;
-  font-variant-numeric: tabular-nums;
-}
-.card-flags {
-  display: inline-flex; align-items: center; gap: 4px;
-  font-size: 10px; color: #b0aca0; font-weight: 500;
-}
-.card-flags .stop-reason {
-  font-family: "SF Mono", "Menlo", monospace;
-  padding: 0 5px; border-radius: 3px;
-  background: #f0f0f0; color: #8d877b;
-  font-size: 9px;
-}
-
-/* Status pill */
-.status-pill {
-  display: flex; align-items: center; gap: 4px; flex-shrink: 0;
-  padding: 2px 10px; border-radius: 6px;
-  font-size: 11px; font-weight: 600; letter-spacing: 0.01em;
-  white-space: nowrap;
-}
-.status-pill.working { background: #d4edda; color: #1e7e34; }
-.status-pill.interrupt { background: #fef5e0; color: #b8860b; }
-.status-pill.idle { background: #e8e8e8; color: #5c5c5c; }
-.status-pill.done { background: #eeeeee; color: #8d877b; }
-
-.pulse-dot { width: 5px; height: 5px; border-radius: 50%; }
-.status-pill.working .pulse-dot { background: #52b788; animation: pulse 2s ease-in-out infinite; }
-.status-pill.interrupt .pulse-dot { background: #e9b741; animation: pulse 2s ease-in-out infinite; }
-
-/* Summary - clamped at 2 lines */
-.card-summary {
-  font-size: 11px; color: #6b6559; line-height: 1.5;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-  flex: 1;
-  margin-top: 2px;
-}
-
-  font-size: 10px; color: #b0aca0; font-weight: 500;
-  font-variant-numeric: tabular-nums;
-}
-
-/* ─── Empty State ─── */
-.empty-state {
-  display: flex; flex-direction: column; align-items: center;
-  padding: 80px 48px; gap: 16px;
-}
-.empty-state .icon { font-size: 32px; opacity: 0.2; color: #b0b0b0; }
-.empty-state h2 { font-size: 16px; font-weight: 600; color: #5c564b; }
-.empty-state p { font-size: 13px; color: #8d877b; font-weight: 450; max-width: 320px; text-align: center; line-height: 1.5; }
-
-/* ─── Transitions ─── */
-.card.filtered-out { opacity: 0.15; pointer-events: none; }
-
-/* ─── Drag & Drop ─── */
-.project-group.dragging { opacity: 0.35; }
-.project-group.drop-target { position: relative; }
-.project-group.drop-target::before {
-  content: ""; position: absolute; left: 0; right: 0; top: -6px; height: 3px;
-  background: #d97757; border-radius: 2px; z-index: 10;
-  box-shadow: 0 0 8px rgba(217,119,87,0.3);
-}
-
-/* ─── Responsive ─── */
-@media (max-width: 1200px) {
-  .session-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
-}
-@media (max-width: 900px) {
-  .app-shell { padding: 14px 16px 28px; }
-  .project-header .path { max-width: 100px; }
-  .status-bar-summary { flex-direction: column; align-items: flex-start; gap: 8px; }
-}
-@media (max-width: 640px) {
-  .header { flex-direction: column; align-items: stretch; }
-  .header-right { justify-content: space-between; }
-  .session-grid { grid-template-columns: 1fr; padding: 10px; }
-  .filters { gap: 4px; }
-  .status-bar-summary .status-tags { flex-wrap: wrap; }
-}
-
-/* ─── Scrollbar ─── */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #d0d0d0; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #b0b0b0; }
-</style>
+<link rel="stylesheet" href="/styles/session.css" />
 </head>
 <body>
 
@@ -368,6 +31,7 @@ body {
   <div class="status-tags">
     <span class="status-tag working">执行中 <span class="tag-count" id="count-working">0</span></span>
     <span class="status-tag interrupt">等待输入 <span class="tag-count" id="count-interrupt">0</span></span>
+<span class="status-tag waiting">等待中 <span class="tag-count" id="count-waiting">0</span></span>
     <span class="status-tag idle">空闲 <span class="tag-count" id="count-idle">0</span></span>
     <span class="status-tag done">已完成 <span class="tag-count" id="count-done">0</span></span>
   </div>
@@ -387,8 +51,11 @@ body {
 
 </div>
 
+<script src="/scripts/session-card.js"></script>
 <script>
 (async function() {
+const { renderCard, ago, escapeHtml } = SessionCard;
+
 const FETCH_URL = "/api/sessions";
 const POLL_FALLBACK_MS = 4000;
 
@@ -402,22 +69,6 @@ const lastUpdateEl = document.getElementById("last-update");
 const connBadge = document.getElementById("connection-badge");
 const connText = document.getElementById("connection-text");
 
-function ago(iso) {
-  if (!iso) return "—";
-  const ms = Date.now() - new Date(iso).getTime();
-  if (ms < 2000) return "刚刚";
-  if (ms < 60000) return `${Math.floor(ms / 1000)}s`;
-  const m = Math.floor(ms / 60000);
-  if (m < 60) return `${m}m`;
-  return `${m}m ${Math.floor((ms % 60000) / 1000)}s`;
-}
-
-function escapeHtml(s) {
-  const d = document.createElement("div");
-  d.textContent = s;
-  return d.innerHTML;
-}
-
 function renderFilters(snapshot) {
   const projects = snapshot.projects || [];
   const total = snapshot.total || 0;
@@ -425,6 +76,7 @@ function renderFilters(snapshot) {
 
   document.getElementById("count-working").textContent = counts.working || 0;
   document.getElementById("count-interrupt").textContent = counts.interrupt || 0;
+  document.getElementById("count-waiting").textContent = counts.waiting || 0;
   document.getElementById("count-idle").textContent = counts.idle || 0;
   document.getElementById("count-done").textContent = counts.done || 0;
   document.getElementById("total-count").textContent = total;
@@ -446,48 +98,9 @@ function renderFilters(snapshot) {
   });
 }
 
-function renderCard(session) {
-  const sc = session.status || "idle";
-  const labelMap = { working:"执行中", interrupt:"等待输入", idle:"空闲", done:"已完成" };
-  const statusLabel = labelMap[sc] || sc;
-  const filtered = activeFilter !== "all" && session.project !== activeFilter;
-  const displayName = session.title || `# ${session.id}`;
-
-  const modelHtml = session.latestModel ? `<span class="model-tag">${escapeHtml(session.latestModel)}</span>` : "";
-  const promptHtml = session.latestPrompt ? `<div class="card-prompt"><span class="prompt-icon">💬</span><span class="prompt-text">${escapeHtml(session.latestPrompt)}</span></div>` : "";
-  const flags = [];
-  if (session.preventedContinuation) flags.push("⏸ 已暂停");
-  if (session.stopReason) flags.push(`<span class="stop-reason">${escapeHtml(session.stopReason)}</span>`);
-  const flagsHtml = flags.length ? `<span class="card-flags">${flags.join(" · ")}</span>` : "";
-
-  return `
-    <div class="card status-${sc} ${filtered ? "filtered-out" : ""}">
-      <div class="card-top">
-        <div class="card-title-group">
-          <div class="card-title">${escapeHtml(displayName)}</div>
-          <div class="card-meta-row">
-            <span class="card-title id">${session.title ? "# " + escapeHtml(session.id) : "# " + escapeHtml(session.id)}</span>
-            ${modelHtml}
-          </div>
-        </div>
-        <span class="status-pill ${sc}">
-          <span class="pulse-dot"></span>
-          ${statusLabel}
-        </span>
-      </div>
-      ${session.summary ? `<div class="card-summary">${escapeHtml(session.summary)}</div>` : ""}
-      ${promptHtml}
-      <div class="card-footer">
-        <span class="activity-time">${escapeHtml(session.lastAgo || ago(session.lastActivityAt))}</span>
-        ${flagsHtml}
-      </div>
-    </div>
-  `;
-}
-
 function renderProjects(snapshot) {
   if (!snapshot) return;
-  const projects = snapshot.projects || [];
+  const sessions = snapshot.sessions || [];
   const total = snapshot.total || 0;
 
   if (total === 0) {
@@ -497,25 +110,18 @@ function renderProjects(snapshot) {
   }
   emptyState.style.display = "none";
 
-  const orderedProjects = applyProjectOrder(projects);
+  // 状态优先级排序：working > interrupt > waiting > idle > done，同状态按最后活动时间倒序
+  const priority = { working: 0, interrupt: 1, waiting: 2, idle: 3, done: 4 };
+  const sorted = [...sessions].sort((a, b) => {
+    const pa = priority[a.status] || 9;
+    const pb = priority[b.status] || 9;
+    if (pa !== pb) return pa - pb;
+    return new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime();
+  });
 
-  let html = "";
-  for (const proj of orderedProjects) {
-    const sessions = proj.sessions || [];
-    const working = sessions.filter(s => s.status === "working").length;
-
-    html += '<div class="project-group">' +
-      '<div class="project-header">' +
-        '<h2>' + escapeHtml(proj.name) + '</h2>' +
-        '<span class="badge">' + sessions.length + ' 终端' + (working ? ' <span class="active-count">&middot; ' + working + ' active</span>' : '') + '</span>' +
-        '<span class="path">' + escapeHtml(proj.path) + '</span>' +
-      '</div>' +
-      '<div class="session-grid">' +
-        sessions.map(renderCard).join("") +
-      '</div></div>';
-  }
-  projectsEl.innerHTML = html;
-  setupDragDrop();
+  projectsEl.innerHTML = '<div class="session-grid">' +
+    sorted.map(s => renderCard(s, { activeFilter })).join("") +
+    '</div>';
 }
 
 function renderAll(snapshot) {
@@ -523,113 +129,15 @@ function renderAll(snapshot) {
   lastSnapshot = snapshot;
   allSessions = snapshot.sessions || [];
 
-  let displaySnapshot = snapshot;
-  if (activeFilter !== "all" && snapshot.projects) {
-    const filtered = { ...snapshot, projects: snapshot.projects.filter(p => p.name === activeFilter) };
-    filtered.total = filtered.projects.reduce((s, p) => s + p.sessions.length, 0);
-    filtered.counts = { working:0, interrupt:0, idle:0, done:0 };
-    for (const p of filtered.projects)
-      for (const s of p.sessions)
-        filtered.counts[s.status]++;
-    displaySnapshot = filtered;
+  let filteredSessions = allSessions;
+  if (activeFilter !== "all") {
+    filteredSessions = allSessions.filter(s => s.project === activeFilter);
   }
 
+  const displaySnapshot = { ...snapshot, sessions: filteredSessions, total: filteredSessions.length };
   renderProjects(displaySnapshot);
   renderFilters(snapshot);
   lastUpdateEl.textContent = ago(snapshot.generatedAt);
-}
-
-// ─── 项目拖拽排序 ───
-let dragProject = null;
-
-function setupDragDrop() {
-  document.querySelectorAll(".project-group").forEach(group => {
-    group.draggable = true;
-    group.removeEventListener("dragstart", onProjStart);
-    group.removeEventListener("dragend", onProjEnd);
-    group.removeEventListener("dragover", onProjOver);
-    group.removeEventListener("dragleave", onProjLeave);
-    group.removeEventListener("drop", onProjDrop);
-    group.addEventListener("dragstart", onProjStart);
-    group.addEventListener("dragend", onProjEnd);
-    group.addEventListener("dragover", onProjOver);
-    group.addEventListener("dragleave", onProjLeave);
-    group.addEventListener("drop", onProjDrop);
-  });
-}
-
-function onProjStart(e) {
-  dragProject = e.target.closest(".project-group");
-  if (!dragProject) return;
-  dragProject.classList.add("dragging");
-  e.dataTransfer.effectAllowed = "move";
-  e.dataTransfer.setData("text/plain", dragProject.querySelector("h2").textContent);
-}
-
-function onProjEnd(e) {
-  const g = e.target.closest(".project-group");
-  if (g) g.classList.remove("dragging");
-  document.querySelectorAll(".project-group.drop-target").forEach(el => el.classList.remove("drop-target"));
-  dragProject = null;
-}
-
-function onProjOver(e) {
-  e.preventDefault();
-  e.dataTransfer.dropEffect = "move";
-  const target = e.target.closest(".project-group");
-  if (!target || target === dragProject || !dragProject) return;
-  const rect = target.getBoundingClientRect();
-  const after = e.clientY > rect.top + rect.height / 2;
-  document.querySelectorAll(".project-group.drop-target").forEach(el => el.classList.remove("drop-target"));
-  const ref = after ? target.nextElementSibling : target;
-  if (ref) ref.classList.add("drop-target");
-  else target.classList.add("drop-target");
-}
-
-function onProjLeave(e) {
-  const t = e.target.closest(".project-group");
-  if (t) t.classList.remove("drop-target");
-}
-
-function onProjDrop(e) {
-  e.preventDefault();
-  if (!dragProject) return;
-  const target = e.target.closest(".project-group");
-  if (!target || target === dragProject) return;
-
-  const container = document.getElementById("projects");
-  const rect = target.getBoundingClientRect();
-  const after = e.clientY > rect.top + rect.height / 2;
-
-  container.insertBefore(dragProject, after ? target.nextElementSibling : target);
-
-  document.querySelectorAll(".project-group.drop-target, .project-group.dragging").forEach(el => {
-    el.classList.remove("drop-target", "dragging");
-  });
-
-  const order = [...container.querySelectorAll(".project-group")].map(g => {
-    const h2 = g.querySelector("h2");
-    return h2 ? h2.textContent : "";
-  }).filter(Boolean);
-  try { localStorage.setItem("project-order", JSON.stringify(order)); } catch {}
-  dragProject = null;
-}
-
-function applyProjectOrder(projects) {
-  try {
-    const saved = localStorage.getItem("project-order");
-    if (!saved) return projects;
-    const order = JSON.parse(saved);
-    const map = {};
-    for (const p of projects) map[p.name] = p;
-    const ordered = [];
-    const unordered = [];
-    for (const name of order) {
-      if (map[name]) { ordered.push(map[name]); delete map[name]; }
-    }
-    for (const name in map) unordered.push(map[name]);
-    return ordered.concat(unordered);
-  } catch { return projects; }
 }
 
 function setConnection(online) {
