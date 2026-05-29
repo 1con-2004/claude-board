@@ -36,6 +36,7 @@ const sessions = new Map();   // sessionId -> SessionState
 const sseClients = new Set(); // res 对象
 const filePositions = new Map(); // filePath -> byte offset
 const projectNameCache = new Map(); // hash -> { projectName, projectPath }
+const renameCache = new Map(); // sessionId -> title（session 被清理后仍保留）
 
 let serverStartedAt = new Date().toISOString();
 
@@ -249,9 +250,11 @@ async function processLine(line, hash) {
     if (!sessions.has(sessionId)) {
       // 新会话 — 项目信息从此固定，不再随 cd 变化
       const proj = await resolveProjectName(hash);
+      const cachedTitle = renameCache.get(sessionId) || ""; // session 被清理后恢复 rename
       sessions.set(sessionId, {
         id: sessionId,
-        title: "",         // 从 /rename 命令提取
+        title: cachedTitle,  // 从 /rename 命令提取（优先缓存）
+        project: proj.projectName,
         project: proj.projectName,
         projectPath: proj.projectPath,
         cwd: d.cwd || proj.projectPath,  // 初始 cwd
@@ -286,6 +289,7 @@ async function processLine(line, hash) {
       const renameMatch = d.content.match(/<command-name>\/rename<\/command-name>[\s\S]*?<command-args>([\s\S]*?)<\/command-args>/);
       if (renameMatch) {
         session.title = renameMatch[1].trim();
+        renameCache.set(sessionId, session.title); // 持久缓存，session 被清理后也不丢失
       }
     }
 
@@ -327,12 +331,14 @@ async function updateAllSessions() {
     // 状态推断
     session.status = inferStatus(session.lastEvents, now, session.hookPing);
 
-    // 清理：done 超过 30min / idle 超过 2h → 删除
+    // 清理：done 超过 30min / idle 超过 2h → 删除（保留 rename 缓存）
     if (session.status === "done" && elapsed > SESSION_CLEANUP_DONE_MS) {
+      if (session.title) renameCache.set(id, session.title);
       sessions.delete(id);
       continue;
     }
     if (session.status === "idle" && elapsed > SESSION_CLEANUP_IDLE_MS) {
+      if (session.title) renameCache.set(id, session.title);
       sessions.delete(id);
       continue;
     }
