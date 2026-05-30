@@ -24,7 +24,7 @@ const POLL_MS = 2000;
 const HOOK_PING_GRACE_MS = 15000;
 const IDLE_THRESHOLD_MS = 45000;
 const DONE_THRESHOLD_MS = 300000;
-const WAITING_THRESHOLD_MS = 600000;  // 等待 sub-agent 返回，最长保持 waiting 10min
+const WAITING_THRESHOLD_MS = 1800000;  // 等待 sub-agent 返回，最长保持 waiting 30min
 const SESSION_CLEANUP_IDLE_MS = 2 * 60 * 60 * 1000;    // idle > 2h 删除
 const SESSION_CLEANUP_DONE_MS = 30 * 60 * 1000;         // done > 30min 删除
 const SNAPSHOT_ACTIVE_WINDOW_MS = 4 * 60 * 60 * 1000;   // 快照仅返回 4h 内活跃的
@@ -179,6 +179,9 @@ function inferStatus(lastEvents, now, hookPing) {
   const latest = lastEvents[0];
   const elapsed = now - new Date(latest.timestamp).getTime();
 
+  // 等待 sub-agent 返回 → waiting（优先于 idle/done 判定，防止长任务被误判）
+  if (latest.hasSubAgent && elapsed < WAITING_THRESHOLD_MS) return "waiting";
+
   // 过期判定
   if (elapsed > DONE_THRESHOLD_MS) return "done";
   if (elapsed > IDLE_THRESHOLD_MS) return "idle";
@@ -213,9 +216,6 @@ function inferStatus(lastEvents, now, hookPing) {
   if (latest.type === "assistant" && !latest.hasToolUse) {
     return elapsed < 10000 ? "working" : "interrupt";
   }
-
-  // 等待 sub-agent 返回 → waiting（比 idle 更活跃，保持更久）
-  if (latest.hasSubAgent && elapsed < WAITING_THRESHOLD_MS) return "waiting";
 
   return "idle";
 }
@@ -398,6 +398,7 @@ function getSnapshot() {
 
     const entry = {
       id: id.slice(0, 8),
+      fullId: id,
       title: s.title || "",
       project: s.project,
       projectPath: s.projectPath,
@@ -523,6 +524,68 @@ async function handleRequest(req, res) {
     return;
   }
 
+  // API: Session 对话时间线
+  if (pathname === "/api/session-timeline") {
+    const sessionId = url.searchParams.get("sessionId");
+    if (!sessionId) {
+      res.writeHead(400);
+      res.end(JSON.stringify({ error: "Missing sessionId" }));
+      return;
+    }
+    try {
+      // 在所有项目目录中搜索该 session 的 JSONL 文件
+      const dirs = await getProjectDirs();
+      let found = null;
+      for (const d of dirs) {
+        const files = getJsonlFiles(d.dir);
+        const match = files.find(f => path.basename(f, ".jsonl") === sessionId || path.basename(f) === sessionId);
+        if (match) { found = match; break; }
+      }
+      if (!found) {
+        // 尝试用 sessionId 的前 8 位模糊匹配
+        for (const d of dirs) {
+          const files = getJsonlFiles(d.dir);
+          const match = files.find(f => path.basename(f).startsWith(sessionId));
+          if (match) { found = match; break; }
+        }
+      }
+      if (!found) {
+        res.writeHead(404);
+        res.end(JSON.stringify({ error: "Session not found" }));
+        return;
+      }
+      const content = await fsp.readFile(found, "utf8");
+      const lines = content.trim().split("\n").filter(Boolean);
+      const events = lines.map(l => {
+        try {
+          const d = JSON.parse(l);
+          return {
+            type: d.type,
+            timestamp: d.timestamp,
+            model: d.message?.model || "",
+            content: d.type === "user"
+              ? (typeof d.message?.content === "string" ? d.message.content.slice(0, 500) : "")
+              : d.type === "assistant"
+                ? (Array.isArray(d.message?.content)
+                    ? d.message.content.filter(c => c?.type === "text").map(c => c.text).join(" ").slice(0, 500)
+                    : "")
+                : "",
+            hasToolUse: d.type === "assistant" && Array.isArray(d.message?.content)
+              && d.message.content.some(c => c?.name === "Skill" || c?.type === "tool_use"),
+            command: d.subtype === "local_command" ? (d.content || "").slice(0, 200) : "",
+            isRename: d.type === "system" && d.subtype === "local_command" && (d.content || "").includes("/rename"),
+          };
+        } catch { return null; }
+      }).filter(Boolean);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ sessionId, filePath: found, total: events.length, events }));
+    } catch (err) {
+      res.writeHead(500);
+      res.end(JSON.stringify({ error: err.message }));
+    }
+    return;
+  }
+
   // 看板页面（禁止浏览器缓存，确保动态内容实时更新）
   if (pathname === "/" || pathname === "/session-dashboard.html") {
     try {
@@ -549,56 +612,91 @@ async function handleRequest(req, res) {
   res.end("Not Found");
 }
 
+// ─── 看门狗（检测事件循环挂死） ───
+let watchdogTick = Date.now();
+setInterval(() => {
+  const now = Date.now();
+  const lag = now - watchdogTick;
+  // 超过 30s 没有 tick → 进程挂死，exit 让 LaunchAgent 重启
+  if (lag > 30000) {
+    console.error(`[WATCHDOG] 事件循环停滞 ${lag}ms，主动退出`);
+    process.exit(1);
+  }
+  watchdogTick = now;
+}, 5000).unref();
+
+// ─── 请求超时保护 ───
+const REQUEST_TIMEOUT_MS = 30000;
+function wrapHandleRequest(handler) {
+  return (req, res) => {
+    const timer = setTimeout(() => {
+      try { res.writeHead(503, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: "Request timeout" })); } catch {}
+    }, REQUEST_TIMEOUT_MS);
+    Promise.resolve(handler(req, res)).finally(() => clearTimeout(timer));
+  };
+}
+
 // ─── 启动 ───
 async function main() {
-  // 初始扫描 — 先设位置到尾端
-  const initialFiles = await scanAllJsonlFiles();
-  for (const { filePath } of initialFiles) {
-    try {
-      const stat = await fsp.stat(filePath);
-      filePositions.set(filePath, stat.size);
-    } catch { /* skip */ }
-  }
-  console.log(`扫描到 ${initialFiles.length} 个 session 文件`);
+  const server = http.createServer(wrapHandleRequest(handleRequest));
 
-  // 回填：读取每个 session 文件末尾 30 行重建状态
-  console.log("回填历史会话...");
-  let backfilled = 0;
-  for (const { filePath, hash } of initialFiles) {
-    try {
-      const stat = await fsp.stat(filePath);
-      // 跳过超过活跃窗口的文件（未修改过说明早已结束）
-      if (Date.now() - stat.mtimeMs > SNAPSHOT_ACTIVE_WINDOW_MS) continue;
-
-      const content = await fsp.readFile(filePath, "utf8");
-      const lines = content.trim().split("\n").filter(Boolean);
-      const tail = lines.slice(-30);
-      for (const line of tail) {
-        await processLine(line, hash);
-      }
-      // 处理 /rename 命令可能存在于更早的行
-      for (const line of lines) {
-        if (line.includes("/rename")) {
-          await processLine(line, hash);
-        }
-      }
-      backfilled++;
-    } catch { /* skip */ }
-  }
-  console.log(`回填 ${backfilled} 个文件, ${sessions.size} 个会话`);
-
-  // 启动轮询
-  setInterval(async () => {
-    await scanRound();
-    broadcast(getSnapshot());
-  }, POLL_MS);
-
-  // HTTP 服务
-  const server = http.createServer(handleRequest);
+  // 先启动 HTTP 服务，再在后台回填（防止启动卡死）
   server.listen(PORT, HOST, () => {
     console.log(`Session Monitor running at http://${HOST}:${PORT}`);
     console.log(`Poll interval: ${POLL_MS}ms`);
   });
+
+  // 后台回填
+  setTimeout(async () => {
+    try {
+      const initialFiles = await scanAllJsonlFiles();
+      for (const { filePath } of initialFiles) {
+        try {
+          const stat = await fsp.stat(filePath);
+          filePositions.set(filePath, stat.size);
+        } catch { /* skip */ }
+      }
+      console.log(`扫描到 ${initialFiles.length} 个 session 文件`);
+
+      // 限制回填文件数，防止启动过慢
+      const BACKFILL_MAX = 50;
+      console.log("回填历史会话...");
+      let backfilled = 0;
+      for (const { filePath, hash } of initialFiles) {
+        if (backfilled >= BACKFILL_MAX) break;
+        try {
+          const stat = await fsp.stat(filePath);
+          if (Date.now() - stat.mtimeMs > SNAPSHOT_ACTIVE_WINDOW_MS) continue;
+
+          const content = await fsp.readFile(filePath, "utf8");
+          const lines = content.trim().split("\n").filter(Boolean);
+          const tail = lines.slice(-30);
+          for (const line of tail) {
+            await processLine(line, hash);
+          }
+          for (const line of lines) {
+            if (line.includes("/rename")) {
+              await processLine(line, hash);
+            }
+          }
+          backfilled++;
+        } catch { /* skip */ }
+      }
+      console.log(`回填 ${backfilled} 个文件, ${sessions.size} 个会话`);
+    } catch (err) {
+      console.error(`回填异常: ${err.message}`);
+    }
+
+    // 启动轮询
+    setInterval(async () => {
+      try {
+        await scanRound();
+        broadcast(getSnapshot());
+      } catch (err) {
+        console.error(`轮询异常: ${err.message}`);
+      }
+    }, POLL_MS);
+  }, 100);
 }
 
 main().catch(err => {

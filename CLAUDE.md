@@ -27,6 +27,8 @@ skill-usage/
 │   ├── history.html           # 历史 — 年度日历
 │   ├── session-dashboard.html # 会话监控 — 终端状态看板
 │   ├── styles.css             # 全局样式（CSS 变量，支持暗色模式）
+│   ├── styles/                # 独立页面样式
+│   │   └── session.css        # Session 监控页样式（含暗色模式）
 │   ├── favicon.svg
 │   └── scripts/
 │       ├── dashboard-core.js  # 共享核心（i18n/主题/API/格式化）
@@ -34,7 +36,8 @@ skill-usage/
 │       ├── home-page.js       # 首页渲染逻辑
 │       ├── monitor-page.js    # 监控页渲染逻辑
 │       ├── trends-page.js     # 趋势页渲染逻辑
-│       └── history-page.js    # 历史页渲染逻辑
+│       ├── history-page.js    # 历史页渲染逻辑
+│       └── session-card.js    # Session 卡片渲染组件
 ├── scripts/
 │   ├── session-monitor.js     # Session 监控 HTTP 服务（端口 3211）
 │   ├── claude-code-monitor.js # 监听 ~/.claude/projects/ 日志，上报 Skill 事件
@@ -106,10 +109,16 @@ npm test
 `session-monitor.js`（端口 3211）提供：
 - `GET /api/sessions` — 获取所有会话的实时快照
 - `GET /api/sse` — SSE 推送会话状态变化
+- `GET /api/session-timeline?sessionId=` — 获取指定会话的完整对话时间线
+- `POST /api/ping` — Hook 心跳上报，辅助状态判定
 - 监听 `~/.claude/projects/**/*.jsonl` 文件变化
-- 推断状态：working / interrupt / idle / done
-- 按项目分组、支持拖拽排序（排序存 localStorage）
+- 推断状态：working / interrupt / waiting / idle / done（sub-agent 等待优先于空闲判定）
+- 扁平卡片网格布局（无项目分组），支持按项目筛选、关键词搜索
+- 点击卡片展开对话时间线详情弹窗
+- 状态颜色自定义（⚙️ 设置面板，持久化到 localStorage）
+- 暗色模式，跟随系统偏好或手动切换
 - 空闲 > 2h 自动清理，完成 > 30min 自动清理
+- `/rename` 标题持久化缓存，session 清理后不丢失
 
 ## Claude Code 监控
 
@@ -143,6 +152,7 @@ npm test
 ## 注意事项
 
 - `data/` 目录下的 `dashboard-process.json` 已加入 `.gitignore`
+- `logs/` 运行日志目录已加入 `.gitignore`
 - 不要在 `server.js` 手动改端口，通过环境变量 `PORT` 配置
-- 前端 CSS 是独立 `styles.css`，`session-dashboard.html` 使用内联 style 块
-- 暗色模式对 `session-dashboard.html` 不生效（它没有跟随主看板的主题系统）
+- Session 监控使用独立的 `public/styles/session.css`，已支持暗色模式
+- 前端 CSS 是独立 `styles.css`，`session-dashboard.html` 使用独立的 `styles/session.css`

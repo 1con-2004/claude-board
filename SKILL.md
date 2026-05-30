@@ -21,7 +21,8 @@ npm run claude:start
 ```
 
 - Main dashboard: http://127.0.0.1:3210
-- Session monitor: http://127.0.0.1:3211/session-dashboard.html
+- Session monitor: http://127.0.0.1:3211/
+- Session dashboard: http://127.0.0.1:3211/
 
 ## Architecture
 
@@ -53,6 +54,9 @@ Two independent HTTP servers:
 - JSONL persistence for external tooling integration
 - Claude Code session log auto-detection
 - Codex sessions auto-monitor
+- **Session Monitor**: flat card grid, keyword search, click-to-detail timeline modal
+- **Session Monitor**: custom status colors (settings panel, localStorage persistence)
+- **Session Monitor**: sub-agent waiting state detection, rename title persistence
 
 ## API Endpoints
 
@@ -69,12 +73,26 @@ Two independent HTTP servers:
 |--------|------|-------------|
 | GET | `/api/sessions` | All session live snapshot |
 | GET | `/api/sse` | SSE session state changes |
+| GET | `/api/session-timeline?sessionId=` | Full conversation timeline for a session |
+| POST | `/api/ping` | Hook heartbeat for status assistance |
+
+### Status Inference
+
+| Status | Label | Condition |
+|--------|-------|-----------|
+| `working` | 执行中 | Recent tool_use (<15s), recent user msg (<45s), or hook ping |
+| `interrupt` | 等待输入 | Assistant text response idle >10s |
+| `waiting` | 等待中 | Sub-agent running (<30min, checked before idle/done) |
+| `idle` | 空闲 | No activity >45s |
+| `done` | 已完成 | No activity >5min |
 
 ## Key Implementation Notes
 
 - All CSS uses CSS custom properties with amber brand color (`#FFB74D`)
 - Dark mode toggled via `html.dark` class, persisted in localStorage
-- The 4 main pages share `/styles.css`; `session-dashboard.html` has its own inline `<style>`
+- The 4 main pages share `/styles.css`; `session-dashboard.html` uses its own `/styles/session.css`
+- Session dashboard has its own dark mode support (CSS variables, toggle button, localStorage)
+- Session dashboard supports custom status colors (settings modal, localStorage persistence)
 - `dashboard-core.js` is the shared module (i18n, theme, formatting, API helpers)
 - Session monitor watches `~/.claude/projects/**/*.jsonl` for file changes
 - Claude Code monitor detects Skill tool calls from session logs and POSTs to `/api/events`
@@ -94,3 +112,5 @@ Two independent HTTP servers:
 |----------|---------|-------------|
 | SESSION_PORT | 3211 | Server port |
 | HOST | 127.0.0.1 | Bind address |
+| POLL_MS | 2000 | JSONL file poll interval (ms) |
+| WAITING_THRESHOLD_MS | 1800000 | Sub-agent waiting timeout (30min) |
